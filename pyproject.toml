@@ -1,0 +1,12 @@
+[project]
+name = "nexobot"
+version = "0.1.0"
+description = "Comprehensive Telegram bot for NexoBuzz community platform"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.1.1",
+    "google-generativeai==0.8.3",
+    "python-telegram-bot==20.7",
+    "sift-stack-py>=0.8.3",
+    "telegram>=0.0.1",
+]
