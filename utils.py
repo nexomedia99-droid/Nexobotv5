@@ -1,5 +1,11 @@
 import os
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()  # baca file .env
+print("DEBUG BOT_TOKEN:", os.getenv("BOT_TOKEN"))
+print("DEBUG GEMINI_API_KEY:", os.getenv("GEMINI_API_KEY"))
+print("DEBUG OWNER_ID:", os.getenv("OWNER_ID"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,19 +32,19 @@ except ValueError:
 def ensure_env():
     """Ensure all required environment variables are set"""
     missing = []
-    
+
     if not BOT_TOKEN:
         missing.append("BOT_TOKEN")
     if not GEMINI_API_KEY:
         missing.append("GEMINI_API_KEY")
     if OWNER_ID == 0:
         missing.append("OWNER_ID")
-    
+
     if missing:
         error_msg = f"Missing required environment variables: {', '.join(missing)}"
         logger.error(error_msg)
         raise RuntimeError(error_msg)
-    
+
     logger.info("✅ All required environment variables are configured")
 
 def format_currency(amount):

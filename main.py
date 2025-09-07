@@ -7,7 +7,7 @@ from telegram.ext import (
     CallbackQueryHandler, filters, ConversationHandler, ContextTypes
 )
 from telegram import Update
-from dotenv import load_dotenv
+
 
 from utils import ensure_env, BOT_TOKEN
 from start import start, button_handler, check_milestone, new_member_handler, left_member_handler, hidden_tag_handler
@@ -31,7 +31,6 @@ from jobs import postjob_conv, postjob_command, updatejob_command, resetjob_comm
 from help import help_command
 from leaderboard import leaderboard_command, points_command
 
-load_dotenv()
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
