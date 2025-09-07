@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-DB_PATH = "data.db"
+DB_PATH = "database.db"
 
 def init_db():
     first_setup = not os.path.exists(DB_PATH)
