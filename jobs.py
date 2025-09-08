@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, Con
 from decorators import admin_only
 from db import (
     add_job, get_all_jobs, get_job_by_id, add_applicant, get_applicants_by_job,
-    get_user_by_id, add_badge_to_user, has_badge, get_total_applies, add_points_to_user, get_conn
+    get_user_by_id, add_badge_to_user, has_badge, get_total_applies, get_conn
 )
 from utils import sanitize_input, get_user_display_name, GROUP_ID, BUZZER_TOPIC_ID, INFLUENCER_TOPIC_ID, PAYMENT_TOPIC_ID
 from datetime import datetime

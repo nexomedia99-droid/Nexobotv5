@@ -204,50 +204,50 @@ async def summary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type not in ["group", "supergroup"]:
         await update.message.reply_text("Fitur summary hanya tersedia di grup.")
         return
-    
+
     user_id = str(update.effective_user.id)
-    
+
     # Check if user is registered
     if not get_user_by_id(user_id):
         await update.message.reply_text(
-            "❌ Kamu harus daftar dulu untuk menggunakan fitur ini. Ketik `/register` di private chat bot."
+            "❌ Kamu harus daftar dulu untuk menggunakan fitur ini. Ketik /register di private chat bot."
         )
         return
-    
+
     try:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-        
+
         chat_id = str(update.effective_chat.id)
         recent_messages = get_recent_group_messages(chat_id, limit=30)
-        
+
         if not recent_messages:
             await update.message.reply_text(
                 "📝 Belum ada pesan yang cukup untuk dirangkum. Chat dulu yuk!"
             )
             return
-        
+
         # Prepare messages for AI
         conversation_text = ""
         for username, message, timestamp in reversed(recent_messages):  # Reverse to get chronological order
             conversation_text += f"{username}: {message}\n"
-        
+
         # Generate summary
         system_prompt = (
-            "Kamu adalah asisten yang bertugas merangkum percakapan grup. ",
-            "Buatlah ringkasan dari percakapan berikut. ",
-            "Fokus pada topik utama, poin penting, dan keputusan yang diambil. ",
+            "Kamu adalah asisten yang bertugas merangkum percakapan grup. "
+            "Buatlah ringkasan dari percakapan berikut. "
+            "Fokus pada topik utama, poin penting, dan keputusan yang diambil. "
             "Gunakan bahasa Indonesia yang ringkas dan mudah dipahami dan tidak formal. "
-            "Jika tidak ada topik yang signifikan, berikan ringkasan umum aktivitas grup.",
-            "persona anda adalah gen z abiezzz, santai tapi interaktif, suka bercanda, agak ngeselin, informatif, dan helpful."
+            "Jika tidak ada topik yang signifikan, berikan ringkasan umum aktivitas grup. "
+            "Persona anda adalah gen z abiezzz, santai tapi interaktif, suka bercanda, agak ngeselin, informatif, dan helpful."
         )
-        
+
         prompt = f"Rangkum percakapan grup berikut:\n\n{conversation_text}"
-        
+
         model = genai.GenerativeModel(
             model_name='gemini-1.5-flash',
             system_instruction=system_prompt
         )
-        
+
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(
@@ -255,30 +255,28 @@ async def summary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 temperature=0.5,
             )
         )
-        
+
         if response.text:
             summary_text = response.text
-            
-            await update.message.reply_text(
-                f"📝 *Ringkasan Percakapan Grup*\n\n{summary_text}\n\n"
-                f"_Berdasarkan {len(recent_messages)} pesan terakhir_",
-                parse_mode="Markdown"
-            )
-            
-            # Give points for using summary
-            #add_points_to_user(user_id, 2)
 
-            
+            await update.message.reply_text(
+                f"📝 <b>Ringkasan Percakapan Grup</b>\n\n{summary_text}\n\n"
+                f"<i>Berdasarkan {len(recent_messages)} pesan terakhir</i>",
+                parse_mode="HTML"
+            )
+
+            # Give points for using summary
+            # add_points_to_user(user_id, 2)
+
         else:
             await update.message.reply_text(
                 "📝 Maaf, tidak bisa membuat ringkasan saat ini. Coba lagi nanti ya!"
             )
-            
+
     except Exception as e:
         logger.error(f"Summary generation failed: {e}")
         await update.message.reply_text(
-            "📝 Terjadi kesalahan saat membuat ringkasan. Coba lagi nanti ya!",
-            parse_mode="Markdown"
+            "📝 Terjadi kesalahan saat membuat ringkasan. Coba lagi nanti ya!"
         )
 
 async def group_activity_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
