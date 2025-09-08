@@ -20,3 +20,4 @@ env/
 # Replit specific
 *.replit
 .replit/
+*.db
