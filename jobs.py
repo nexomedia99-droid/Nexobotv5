@@ -1,3 +1,5 @@
+import re
+import html
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from decorators import admin_only
@@ -8,6 +10,8 @@ from db import (
 from utils import sanitize_input, get_user_display_name, GROUP_ID, BUZZER_TOPIC_ID, INFLUENCER_TOPIC_ID, PAYMENT_TOPIC_ID
 from datetime import datetime
 import logging
+
+URL_RE = re.compile(r'(https?://[^\s]+)', re.IGNORECASE)
 
 logger = logging.getLogger(__name__)
 
@@ -40,19 +44,41 @@ def log_activity(action_type, user_id=None, description=""):
 # ======== POST JOB CONVERSATION STATES ========
 POSTJOB_TITLE, POSTJOB_FEE, POSTJOB_DESC, POSTJOB_TOPIC = range(4)
 
+# Regex untuk mendeteksi URL
+URL_RE = re.compile(r'(https?://[^\s]+)', re.IGNORECASE)
+
+def html_escape_and_linkify(text: str) -> str:
+    """
+    Escape text for HTML, but convert URLs into <a href="...">...</a>
+    so they remain clickable.
+    """
+    parts = []
+    last_end = 0
+    for m in URL_RE.finditer(text):
+        # escape text sebelum URL
+        if m.start() > last_end:
+            parts.append(html.escape(text[last_end:m.start()]))
+        url = m.group(0)
+        esc_url = html.escape(url, quote=True)
+        parts.append(f'<a href="{esc_url}">{esc_url}</a>')
+        last_end = m.end()
+    # sisa text
+    if last_end < len(text):
+        parts.append(html.escape(text[last_end:]))
+    return ''.join(parts)
+
 @admin_only
 async def postjob_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start job posting process"""
     await update.message.reply_text(
-        "📝 *Posting Job Baru*\n\n"
+        "📝 <b>Posting Job Baru</b>\n\n"
         "Langkah 1/4: Masukkan judul job\n\n"
-        "💡 *Tips:* Buat judul yang menarik dan jelas",
-        parse_mode="Markdown"
+        "💡 <b>Tips:</b> Buat judul yang menarik dan jelas",
+        parse_mode="HTML"
     )
     return POSTJOB_TITLE
 
 async def postjob_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle job title input"""
     title = sanitize_input(update.message.text.strip())
 
     if len(title) < 5:
@@ -61,15 +87,14 @@ async def postjob_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data['postjob_title'] = title
     await update.message.reply_text(
-        "💰 *Langkah 2/4: Fee/Gaji*\n\n"
+        "💰 <b>Langkah 2/4: Fee/Gaji</b>\n\n"
         "Masukkan nominal fee (contoh: 10000 atau 10k atau 10rb)\n\n"
         "💡 Bisa juga format seperti: '5k-10k' untuk range",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return POSTJOB_FEE
 
 async def postjob_fee(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle job fee input"""
     fee = sanitize_input(update.message.text.strip())
 
     if len(fee) < 2:
@@ -78,19 +103,18 @@ async def postjob_fee(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data['postjob_fee'] = fee
     await update.message.reply_text(
-        "📋 *Langkah 3/4: Deskripsi Job*\n\n"
+        "📋 <b>Langkah 3/4: Deskripsi Job</b>\n\n"
         "Masukkan deskripsi lengkap job:\n"
         "• Apa yang harus dilakukan\n"
         "• Syarat/ketentuan\n"
         "• Deadline (jika ada)\n"
         "• Link yang perlu diakses\n\n"
         "💡 Gunakan format yang jelas dan mudah dipahami",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return POSTJOB_DESC
 
 async def postjob_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle job description input"""
     desc = sanitize_input(update.message.text.strip(), max_length=2000)
 
     if len(desc) < 10:
@@ -109,17 +133,16 @@ async def postjob_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📍 *Langkah 4/4: Pilih Kategori*\n\n"
-        "🎯 **Buzzer** - Untuk job buzzer/promosi umum\n"
-        "🌟 **Influencer** - Untuk job khusus influencer\n\n"
+        "📍 <b>Langkah 4/4: Pilih Kategori</b>\n\n"
+        "🎯 <b>Buzzer</b> - Untuk job buzzer/promosi umum\n"
+        "🌟 <b>Influencer</b> - Untuk job khusus influencer\n\n"
         "Pilih kategori yang sesuai:",
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=reply_markup
     )
     return POSTJOB_TOPIC
 
 async def postjob_topic_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle topic selection and create job"""
     query = update.callback_query
     await query.answer()
 
@@ -129,7 +152,7 @@ async def postjob_topic_selection(update: Update, context: ContextTypes.DEFAULT_
         fee = context.user_data['postjob_fee']
         desc = context.user_data['postjob_desc']
 
-        # Determine topic based on selection
+        # Determine topic
         if query.data == "topic_buzzer":
             topic_id = BUZZER_TOPIC_ID
             topic_name = "Buzzer"
@@ -145,44 +168,46 @@ async def postjob_topic_selection(update: Update, context: ContextTypes.DEFAULT_
         # Create job in database
         job_id = add_job(title, fee, desc, status="aktif")
 
+        # Escape & linkify
+        safe_title = html.escape(title)
+        safe_fee = html.escape(fee)
+        safe_desc = html_escape_and_linkify(desc)
+
         # Create job post message
         job_text = (
-            f"📢 *JOB BARU - {topic_emoji} {topic_name.upper()}*\n\n"
-            f"🆔 **ID:** {job_id}\n"
-            f"📌 **Judul:** {title}\n"
-            f"💰 **Fee:** {fee}\n\n"
-            f"📋 **Deskripsi:**\n{desc}\n\n"
-            f"🟢 **Status:** Aktif"
+            f"📢 <b>JOB BARU - {html.escape(topic_emoji)} {html.escape(topic_name.upper())}</b>\n\n"
+            f"🆔 <b>ID:</b> {html.escape(str(job_id))}\n"
+            f"📌 <b>Judul:</b> {safe_title}\n"
+            f"💰 <b>Fee:</b> {safe_fee}\n\n"
+            f"📋 <b>Deskripsi:</b>\n{safe_desc}\n\n"
+            f"🟢 <b>Status:</b> Aktif"
         )
 
-        # Create apply button
+        # Apply button
         reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ Apply Job", callback_data=f"apply_{job_id}")]
         ])
 
-        # Send to appropriate topic
-        target_chat_id = GROUP_ID
-        send_kwargs = {
-            "chat_id": target_chat_id,
-            "text": job_text,
-            "parse_mode": "Markdown",
-            "reply_markup": reply_markup,
-            "message_thread_id": topic_id
-        }
-
-        await context.bot.send_message(**send_kwargs)
+        # Send to group
+        await context.bot.send_message(
+            chat_id=GROUP_ID,
+            text=job_text,
+            parse_mode="HTML",
+            reply_markup=reply_markup,
+            message_thread_id=topic_id
+        )
 
         # Confirm to admin
         await query.edit_message_text(
-            f"✅ *Job Berhasil Diposting!*\n\n"
-            f"🆔 **Job ID:** {job_id}\n"
-            f"📍 **Kategori:** {topic_name} ({topic_emoji})\n"
-            f"📌 **Judul:** {title}\n\n"
+            f"✅ <b>Job Berhasil Diposting!</b>\n\n"
+            f"🆔 <b>Job ID:</b> {job_id}\n"
+            f"📍 <b>Kategori:</b> {topic_name} ({topic_emoji})\n"
+            f"📌 <b>Judul:</b> {safe_title}\n\n"
             f"Job telah diposting ke grup dan siap menerima aplikasi!",
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
-        # Log activity
+        # Log
         log_activity("job_posted", str(query.from_user.id), f"Job {job_id} posted: {title}")
 
     except Exception as e:
@@ -194,11 +219,10 @@ async def postjob_topic_selection(update: Update, context: ContextTypes.DEFAULT_
     return ConversationHandler.END
 
 async def postjob_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Cancel job posting"""
     await update.message.reply_text("❌ Posting job dibatalkan.")
     return ConversationHandler.END
 
-# Job posting conversation handler
+# Conversation handler
 postjob_conv = ConversationHandler(
     entry_points=[CommandHandler("postjob", postjob_command)],
     states={
